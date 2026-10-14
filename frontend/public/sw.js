@@ -28,14 +28,24 @@ self.addEventListener('notificationclick', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
-  if (e.request.method !== 'GET' || url.origin !== location.origin) return
-  if (url.pathname.startsWith('/api/')) return    // never cache auth/data
+  if (e.request.method !== 'GET') return
+  const exerciseMedia = url.origin === 'https://cdn.jsdelivr.net' &&
+    /^\/gh\/hasaneyldrm\/exercises-dataset@[\w.-]+\/(images|videos)\//.test(url.pathname)
+  if (url.origin !== location.origin && !exerciseMedia) return
+  if (url.origin === location.origin && url.pathname.startsWith('/api/')) return // never cache auth/data
 
-  const isMedia = url.pathname.includes('/img/') || url.pathname.includes('/gif/')
+  const isMedia = exerciseMedia || url.pathname.includes('/img/') || url.pathname.includes('/gif/')
   if (isMedia) {
-    e.respondWith(caches.open(CACHE).then(c => c.match(e.request).then(hit =>
-      hit || fetch(e.request).then(res => { if (res.ok) c.put(e.request, res.clone()); return res })
-    )))
+    const cached = caches.open(CACHE).then(async c => ({ c, hit: await c.match(e.request) })).catch(() => null)
+    e.respondWith(cached.then(state => {
+      if (state && state.hit) return state.hit
+      return fetch(e.request).then(async res => {
+        if (state && (res.ok || res.type === 'opaque')) {
+          try { await state.c.put(e.request, res.clone()) } catch {}
+        }
+        return res
+      })
+    }))
   } else {
     e.respondWith(fetch(e.request).then(res => {
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()))

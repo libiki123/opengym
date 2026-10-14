@@ -1,42 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useUI } from '../store/useUI.js'
+import { createSheetTouchHandlers } from '../lib/sheet-touch.js'
 
-// One bottom sheet (or centered dialog) with swipe-to-dismiss.
 function Sheet({ sheet }) {
   const { closeSheet } = useUI()
   const ref = useRef(null)
-  const drag = useRef({ startY: null, delta: 0 })
+  const drag = useRef({ startY: null, startX: null, delta: 0, axis: null })
+  const { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel } = createSheetTouchHandlers(ref, drag, sheet, closeSheet)
 
-  const onTouchStart = e => {
-    const el = ref.current
-    // a gesture that begins on a slider (or opted-out control) belongs to that control,
-    // not to the sheet's swipe-to-dismiss — so it keeps working while you drag
-    if (e.target.closest && e.target.closest('input[type=range], [data-nodrag]')) {
-      drag.current = { startY: null, delta: 0 }
-      return
-    }
-    drag.current = { startY: el.scrollTop <= 0 ? e.touches[0].clientY : null, delta: 0 }
-  }
-  const onTouchMove = e => {
-    const el = ref.current, d = drag.current
-    if (d.startY === null) return
-    d.delta = e.touches[0].clientY - d.startY
-    if (d.delta > 0 && el.scrollTop <= 0) {
-      e.preventDefault()
-      el.style.transition = 'none'
-      el.style.transform = `translateY(${d.delta}px)`
-    } else d.delta = 0
-  }
-  const onTouchEnd = () => {
-    const el = ref.current, d = drag.current
-    if (d.startY === null) return
-    el.style.transition = 'transform .2s'
-    if (d.delta > 90 && !sheet.locked) { el.style.transform = 'translateY(110%)'; setTimeout(() => closeSheet(sheet.id), 180) }
-    else el.style.transform = ''
-    d.startY = null
-  }
-
-  // non-passive touchmove so preventDefault works (bottom sheets only; centered dialogs have no ref)
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -56,7 +27,7 @@ function Sheet({ sheet }) {
   return (
     <div>
       <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
-      <div className="sheet" ref={ref} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="sheet" ref={ref} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
         <div className="grab" />
         {sheet.render(close)}
       </div>
@@ -66,8 +37,6 @@ function Sheet({ sheet }) {
 
 export default function Modals() {
   const sheets = useUI(s => s.sheets)
-
-  // lock the page behind any open sheet (iOS-safe)
   useEffect(() => {
     if (!sheets.length) return
     const y = window.scrollY || 0
@@ -78,7 +47,6 @@ export default function Modals() {
       window.scrollTo(0, y)
     }
   }, [sheets.length > 0])
-
   if (!sheets.length) return null
   return (
     <div id="modal-root" className="open">

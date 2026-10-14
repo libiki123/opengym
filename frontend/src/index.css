@@ -649,7 +649,7 @@ h4.sec{
   padding:8px 18px calc(20px + var(--sab));
   max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
   animation:sheetup .34s var(--ease);
-  overscroll-behavior:contain;touch-action:pan-y;will-change:transform;
+  overscroll-behavior:contain;touch-action:pan-x pan-y;will-change:transform;
 }
 :root[data-theme="light"] .sheet{background:var(--bg)}
 @keyframes sheetup{from{transform:translateY(100%)}to{transform:none}}

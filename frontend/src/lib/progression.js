@@ -162,7 +162,10 @@ export function nextPrescription(S, cfg, routine) {
   const last = sessions[sessions.length - 1]
   if (!last) return { policy, kind: 'first', why: ['Nothing logged yet — this session sets the baseline.'] }
 
-  const stalls = stallCount(sessions)
+  // Double progression misses the top of the range until every set gets there. Count
+  // only consecutive sessions with no rep improvement, so climbing through the range
+  // does not trigger a deload.
+  const stalls = policy === 'double' ? doubleStallCount(sessions) : stallCount(sessions)
   const deloadAt = DELOAD_AFTER[policy] || 3
 
   if (mode === 'time') {
@@ -223,6 +226,19 @@ export function nextPrescription(S, cfg, routine) {
     }
   }
   return { policy, kind: 'hold', weight: w, why: ['Missed reps last time — same weight again ({0} of {1} to go).', deloadAt - stalls, deloadAt] }
+}
+
+function doubleStallCount(sessions) {
+  let n = 0
+  let newer
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    const s = sessions[i]
+    const total = s.reps.reduce((sum, reps) => sum + reps, 0)
+    if (s.ok || (newer && (s.weight !== newer.weight || total < newer.total))) break
+    n++
+    newer = { weight: s.weight, total }
+  }
+  return n
 }
 
 /**

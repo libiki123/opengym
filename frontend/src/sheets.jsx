@@ -772,6 +772,7 @@ export function startFlow(routineId) {
   bwSheet({ required: true, onDone: bw => beginWorkout(routineId, bw) })
 }
 export function beginWorkout(routineId, bw) {
+  useUI.getState().stopWork()
   const st = S()
   const r = routineId ? st.routines.find(x => x.id === routineId) : null
   // The prescription is applied as the session is built, so you walk up to the bar with the
@@ -916,6 +917,7 @@ function doFinishWorkout() {
   const st = S()
   const A = st.active
   if (!A) return
+  useUI.getState().stopWork()
   const prs = []
   const e1prs = []
   A.entries.forEach(e => {

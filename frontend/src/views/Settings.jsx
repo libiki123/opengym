@@ -13,6 +13,7 @@ import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { coachAvailable, hasConsent } from '../lib/coach.js'
 import { forgetCoach } from '../lib/coach-api.js'
+import { validBackup } from '../lib/backup.js'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
@@ -41,12 +42,13 @@ export default function Settings() {
   }
   const doImport = ev => {
     const f = ev.target.files[0]; if (!f) return
+    ev.target.value = ''
     const rd = new FileReader()
     rd.onload = () => {
       try {
         const data = JSON.parse(rd.result)
-        if (!data.workouts || !data.routines) throw new Error('not an openGym backup')
-        confirmSheet({ title: t('Import backup?'), message: t('This replaces all current data with the backup file.'), confirmText: t('Import'), danger: true, onConfirm: () => { replaceState(Object.assign(JSON.parse(JSON.stringify(DEF)), data), true); toast(t('Backup imported')) } })
+        if (!validBackup(data)) throw new Error('not a valid openGym backup')
+        confirmSheet({ title: t('Import backup?'), message: t('This replaces all current data with the backup file.'), confirmText: t('Import'), danger: true, onConfirm: () => { const state = Object.assign(JSON.parse(JSON.stringify(DEF)), data); state.customEx = (state.customEx || []).map(c => ({ ...c, tg: c.tg || '', eq: c.eq || 'custom', custom: true })); replaceState(state, true); toast(t('Backup imported')) } })
       } catch (e) { toast(t('Import failed: {0}', e.message)) }
     }
     rd.readAsText(f)

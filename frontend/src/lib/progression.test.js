@@ -263,6 +263,28 @@ describe('double progression', () => {
     expect(p.reps).toBe(8)
     expect(p.weight).toBe(35)           // 40 × 0.9 = 36 → nearest loadable 2.5 step
   })
+
+  it('does not count improving reps within the range as stalls', () => {
+    const p = nextPrescription(hist(LIFT, [[40, 8, 8, 8], [40, 9, 9, 9], [40, 10, 10, 10]], { sets: 3, reps: 12 }), cfg)
+    expect(p.kind).toBe('hold')
+    expect(p.weight).toBe(40)
+    expect(p.reps).toBe(11)
+  })
+
+  it('recognizes total-rep improvement across sets, including a changed set count', () => {
+    const rows = [[40, 8, 8], [40, 9, 9, 8], [40, 10, 10, 8]]
+    const p = nextPrescription(hist(LIFT, rows, { sets: 3, reps: 12 }), cfg)
+    expect(p.kind).toBe('hold')
+    expect(p.weight).toBe(40)
+    expect(p.reps).toBe(9)
+  })
+
+  it('starts a fresh stagnation count when the weight changes', () => {
+    const rows = [[40, 9, 9, 9], [40, 9, 9, 9], [35, 9, 9, 9], [40, 9, 9, 9]]
+    const p = nextPrescription(hist(LIFT, rows, { sets: 3, reps: 12 }), cfg)
+    expect(p.kind).toBe('hold')
+    expect(p.weight).toBe(40)
+  })
 })
 
 describe('timed progression', () => {

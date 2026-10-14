@@ -56,6 +56,15 @@ export const useStore = create((set, get) => {
     }
   }
 
+  window.addEventListener('storage', e => {
+    if (e.key !== KEY) return
+    try {
+      const S = e.newValue ? Object.assign(clone(DEF), JSON.parse(e.newValue)) : clone(DEF)
+      registerCustom(S.customEx)
+      set({ S })
+    } catch { /* ignore invalid external storage */ }
+  })
+
   // A setting changed right before switching away/closing the tab must not get lost mid-debounce
   // (e.g. setting the reminder time then immediately backgrounding to test it). On mobile the
   // same applies to the file mirror — backgrounding is often the last thing before the OS
@@ -94,7 +103,7 @@ export const useStore = create((set, get) => {
 
     // Mutate a draft of S via producer fn, then persist + schedule sync.
     update(mut, push = true) {
-      const S = clone(get().S)
+      const S = loadState()
       mut(S)
       persist(S, push)
     },
