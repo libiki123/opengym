@@ -40,7 +40,13 @@ So `http://localhost:8080` works on the machine running Docker, but **another de
 phone) cannot use `http://<your-LAN-ip>:8080`** — that's neither localhost nor HTTPS, so the
 passkey prompt won't appear. To use openGym from your phone you need a real HTTPS hostname.
 
-(You can still open it over LAN in **guest mode**, which stores data only in that browser.)
+(You can still open it over LAN in **guest mode**, which stores data only in that browser. Export your
+data before clearing browser storage or switching browsers. Multiple tabs receive local-storage
+updates, but simultaneous writes are not atomic and can overwrite each other.)
+
+On HTTPS deployments, browser offline caching stores exercise media as you view it. This also
+supports the exercise dataset CDN used by GitHub Pages. Unseen media still needs a connection
+for its first download; the browser does not preload the whole dataset.
 
 ## 3. Expose it over HTTPS on your own domain
 
