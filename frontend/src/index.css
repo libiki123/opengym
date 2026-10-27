@@ -529,6 +529,7 @@ h4.sec{
 .workout-ex{border:1px solid var(--sep);border-radius:var(--r-lg);overflow:hidden;scroll-margin-top:16px}
 .workout-ex-heading{margin:0}
 .workout-ex-toggle{display:flex;align-items:center;gap:10px;width:100%;padding:14px;text-align:left;font-size:17px;font-weight:600}
+.workout-ex-toggle>.grow{flex:1;min-width:0}
 .workout-ex-toggle>.icn{font-size:14px;color:var(--label-2)}
 .workout-ex-chevron{transition:transform .2s var(--ease)}
 .workout-ex-chevron.expanded{transform:rotate(180deg)}
