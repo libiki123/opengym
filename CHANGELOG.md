@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Workout and tracking improvements
+
+- Workouts use one scrollable list with collapsible exercise sections and set progress.
+  Completing an exercise moves to the next unfinished exercise, including earlier skipped work.
+  The completion prompt appears only when all exercises are done.
+- Exercise rest timers can override the profile default. Superset rests follow completed rounds.
+- Body-fat percentages have dated logs, recent entries, purple trend charts, and JSON backup support.
+- One-time workout moves support explicit swap or replace choices and Undo, without changing the weekly plan.
+- Workout startup keeps the start/change-workout choice without requiring a weigh-in.
+  Sheet dismissal supports mouse dragging as well as touch.
+
 ### The AI Coach
 
 openGym could always progress a plan. It could never *write* one, and it never looked at the
