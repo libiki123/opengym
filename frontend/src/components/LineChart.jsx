@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { fmtNum, fmtDate, MONTHS, isoOf } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 
@@ -13,6 +13,7 @@ const W = 340   // viewBox width; the svg stretches to its container, height com
 //   invert flips the y axis, for a scale that counts down as it gets harder (RIR). Without it
 //   a curve of reps-in-reserve reads upside down, with the hardest sets at the floor.
 export default function LineChart({ points, h = 150, unit = '', color = 'var(--acc)', axes = true, goal = null, invert = false }) {
+  const gid = useId()
   const svgRef = useRef(null)
   const wrapRef = useRef(null)
   const tipRef = useRef(null)
@@ -90,7 +91,6 @@ export default function LineChart({ points, h = 150, unit = '', color = 'var(--a
 
   const poly = pts.map(p => X(p.t).toFixed(1) + ',' + Y(p.y).toFixed(1)).join(' ')
   const last = pts[pts.length - 1]
-  const gid = 'g' + Math.round(t0 % 1e7) + '_' + H
   const hoverPts = (single ? [points[0]] : points).map(p => ({ x: X(p.t), y: Y(p.y), iso: p.d || isoOf(new Date(p.t)), v: p.y, note: p.note }))
   const marked = points.some(p => p.m != null)
 

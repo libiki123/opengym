@@ -143,6 +143,8 @@ export default function Stats() {
 
   const bwPts = S.bodyweight.filter(b => range === 0 || (b.t || new Date(b.d).getTime()) > now - range * 86400000)
     .map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
+  const bfPts = (S.bodyfat || []).filter(b => range === 0 || (b.t || new Date(b.d).getTime()) > now - range * 86400000)
+    .map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.pct, d: b.d }))
   const bw30 = S.bodyweight.filter(b => (b.t || new Date(b.d).getTime()) > now - 30 * 86400000)
   const bwDelta30 = bw30.length > 1 ? bw30[bw30.length - 1].w - bw30[0].w : null
   const monthW = S.workouts.filter(w => w.d.slice(0, 7) === todayISO().slice(0, 7)).length
@@ -225,6 +227,8 @@ export default function Stats() {
         <Segmented className="seg-range" value={range} onChange={setRange}
           options={[{ value: 30, label: '1M' }, { value: 90, label: '3M' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
         <div className="chart"><LineChart points={bwPts} h={160} unit={S.unit} goal={S.targetW} /></div>
+        <h4 className="sec">{t('Body fat')} (%)</h4>
+        <div className="chart"><LineChart points={bfPts} h={160} unit="%" color="var(--purple)" /></div>
       </div>
 
       <div className="card">

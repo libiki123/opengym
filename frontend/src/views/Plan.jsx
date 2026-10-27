@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { DAYN, uid, exCount } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { dayAssignSheet, loadStarterPlan, planToolsSheet } from '../sheets.jsx'
+import { dayAssignSheet, loadStarterPlan, planToolsSheet, calendarSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
@@ -31,7 +31,13 @@ export default function Plan() {
       <button className="iconbtn" onClick={planToolsSheet} aria-label={t('Share your plan')} title={t('Share your plan')}><Icon name="upload" /></button>
     </div>
     <div className="cols"><div>
-      <h4 className="sec">{t('Week schedule')}</h4>
+      <div className="row between" style={{ marginTop: 22, marginBottom: 6 }}>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <h4 className="sec" style={{ margin: 0 }}>{t('Week schedule')}</h4>
+          <span className="muted small">({t('Repeats every week')})</span>
+        </div>
+        <Button size="sm" variant="tinted" onClick={() => calendarSheet()}>{t('Reschedule')}</Button>
+      </div>
       <div className="list" style={{ display: 'flex', flexDirection: 'column' }}>
         {[1, 2, 3, 4, 5, 6, 0].map(d => {
           const r = S.routines.find(x => x.id === S.week[d])

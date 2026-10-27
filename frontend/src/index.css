@@ -322,7 +322,7 @@ h4.sec{
 .wday .lbl{font-size:11px;color:var(--label-3);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
 .wday .num{font-size:17px;font-weight:400;margin:4px 0;letter-spacing:-.012em}
 .wday .dot{width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto}
-.wday .dot.plan{background:var(--label-3)}
+.wday .dot.plan{background:var(--yellow)}
 .wday .dot.ovr{background:var(--orange)}
 .wday .dot.done{background:var(--acc)}
 .wday:active{background:var(--surface-2)}
@@ -525,6 +525,22 @@ h4.sec{
 
 /* ------------------------------------------------------------- workout --- */
 .wprog{height:4px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-bottom:16px}
+.workout-exercises{display:flex;flex-direction:column;gap:16px}
+.workout-ex{border:1px solid var(--sep);border-radius:var(--r-lg);overflow:hidden;scroll-margin-top:16px}
+.workout-ex-heading{margin:0}
+.workout-ex-toggle{display:flex;align-items:center;gap:10px;width:100%;padding:14px;text-align:left;font-size:17px;font-weight:600}
+.workout-ex-toggle>.icn{font-size:14px;color:var(--label-2)}
+.workout-ex-chevron{transition:transform .2s var(--ease)}
+.workout-ex-chevron.expanded{transform:rotate(180deg)}
+.workout-ex-panel{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .2s var(--ease),opacity .2s var(--ease)}
+.workout-ex-panel.expanded{grid-template-rows:1fr;opacity:1}
+.workout-ex-panel-inner{min-height:0;overflow:hidden}
+.workout-ex-number{display:flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--surface-2);font-size:13px}
+.workout-ex.complete .workout-ex-number{color:var(--on-acc);background:var(--acc)}
+.workout-ex-progress{display:block;margin-top:3px;font-weight:400}
+.workout-ex-body{padding:0 12px 14px}
+.workout-ex-body>.card{padding:10px}
+.ss-card .workout-ex+.workout-ex{margin-top:10px}
 .wprog i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width var(--med) var(--ease)}
 .exmedia{position:relative;border-radius:var(--r-lg);overflow:hidden;background:#fff;margin-bottom:12px}
 .exmedia img{width:100%;height:320px;object-fit:contain;display:block}
@@ -845,7 +861,7 @@ h4.sec{
 .cal-d.today{box-shadow:inset 0 0 0 1.8px var(--acc)}
 .cal-d i{width:5px;height:5px;border-radius:50%;background:transparent}
 .cal-d i.done{background:var(--acc)}
-.cal-d i.plan{background:var(--label-3)}
+.cal-d i.plan{background:var(--yellow)}
 .cal-d i.ovr{background:var(--orange)}
 .cal-legend{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:12px;color:var(--label-3)}
 .cal-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px}

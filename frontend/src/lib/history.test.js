@@ -1,10 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, effortOf, stepEffort, capEffort } from './history.js'
+import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, effortOf, stepEffort, capEffort, restSeconds } from './history.js'
 import { EXDB } from './exercises.js'
 
 // Real ids out of the shipped catalogue, so the body-part fallback is exercised for real.
 const CARDIO = EXDB.find(e => e.bp === 'cardio').id
 const LIFT = EXDB.find(e => e.bp !== 'cardio').id
+
+describe('exercise rest timers', () => {
+  it('uses the exercise prescription rather than the profile default', () => {
+    expect(restSeconds({ restSec: 180 }, 90)).toBe(180)
+    expect(restSeconds({ restSec: 60 }, 90)).toBe(60)
+  })
+
+  it.each([undefined, {}, { restSec: 0 }, { restSec: -1 }, { restSec: '180' }, { restSec: Infinity }])('keeps legacy and malformed prescriptions on the profile default: %j', cfg => {
+    expect(restSeconds(cfg, 90)).toBe(90)
+  })
+})
 
 describe('modeOf', () => {
   it('falls back to the body part when a plan has no mode — every existing plan keeps working', () => {

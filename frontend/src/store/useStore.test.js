@@ -22,6 +22,24 @@ beforeEach(async () => {
 })
 
 describe('cross-tab state updates', () => {
+  it('defaults body fat history for older profiles and persists it without changing weight history', () => {
+    const bodyweight = [{ d: '2026-10-25', w: 70 }]
+    storageListener({ key: 'gym_state_v1', newValue: JSON.stringify({ workouts: [], routines: [], bodyweight }) })
+    expect(store.getState().S.bodyfat).toEqual([])
+    memory.set('gym_state_v1', JSON.stringify({ workouts: [], routines: [], bodyweight }))
+    store.getState().update(s => { s.bodyfat.push({ d: '2026-10-26', pct: 18.5, t: 123 }) }, false)
+    expect(JSON.parse(memory.get('gym_state_v1'))).toMatchObject({ bodyweight, bodyfat: [{ d: '2026-10-26', pct: 18.5, t: 123 }] })
+  })
+
+  it('does not replace a body-fat-only profile with an older server profile', async () => {
+    const { api } = await import('../lib/api.js')
+    const bodyfat = [{ d: '2026-10-26', pct: 18.5 }]
+    store.getState().replaceState({ ...store.getState().S, bodyfat })
+    api.mockResolvedValueOnce({ state: { workouts: [], routines: [], _ts: 1 } }).mockResolvedValue({})
+    await store.getState().pullState()
+    expect(store.getState().S.bodyfat).toEqual(bodyfat)
+  })
+
   it('applies a mutation to the latest saved state instead of replacing concurrent changes', () => {
     memory.set('gym_state_v1', JSON.stringify({ workouts: [], routines: [], accent: 'blue' }))
     store.getState().update(s => { s.lang = 'fr' }, false)

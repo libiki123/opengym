@@ -23,6 +23,10 @@ export function fmtSec(sec) {
   return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0')
 }
 
+// Old routines inherit the profile timer; imported invalid overrides do too.
+export const restSeconds = (cfg, fallback) =>
+  Number.isInteger(cfg?.restSec) && cfg.restSec > 0 && cfg.restSec <= 3600 ? cfg.restSec : fallback
+
 // How hard a set felt, if the profile logs it at all. Two scales for the same thing, kept in
 // their own fields: RIR counts the reps still in the tank, RPE reads the same effort off a
 // 10-point scale from the top (RPE 8 ≈ RIR 2). A set logged on one scale is never silently

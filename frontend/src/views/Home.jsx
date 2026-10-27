@@ -52,6 +52,7 @@ export default function Home() {
   const routine = effectiveRoutine(S, todayISO())
   const todayOvr = S.dayPlan[todayISO()] !== undefined
   const bw = lastBW(S)
+  const bf = S.bodyfat?.length ? S.bodyfat[S.bodyfat.length - 1] : null
   const prevBW = S.bodyweight.length > 1 ? S.bodyweight[S.bodyweight.length - 2] : null
   const delta = bw && prevBW ? bw.w - prevBW.w : null
 
@@ -72,9 +73,10 @@ export default function Home() {
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
+  const bfPoints = (S.bodyfat || []).slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.pct, d: b.d }))
 
   // today's session shown right under the week strip
-  const onToday = () => { if (S.active) nav('/workout'); else if (routine) startFlow(routine.id); else dayOverrideSheet(todayISO()) }
+  const onToday = () => { if (S.active) nav('/workout'); else if (routine) startFlow(routine.id, todayISO()); else dayOverrideSheet(todayISO()) }
 
   return <div className="narrow">
     <div className="hdr">
@@ -150,7 +152,13 @@ export default function Home() {
           </div>
         )}
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
-      </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
+      </> : <div className="muted small">{t('No entries yet — log your weight to start the curve.')}</div>}
+      <div className="row" style={{ gap: 8, marginTop: 10 }}>
+        <span className="muted small">{t('Body fat')}</span>
+        {bf ? <><b>{fmtNum(bf.pct)}%</b><span className="dim small" style={{ marginLeft: 'auto' }}>{fmtDate(bf.d, true)}</span></>
+          : <span className="dim small">{t('No entries yet')}</span>}
+      </div>
+      {bfPoints.length > 0 && <div className="chart" style={{ marginTop: 8 }}><LineChart points={bfPoints} h={130} unit="%" color="var(--purple)" /></div>}
     </div>
 
     <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => calendarSheet()}>

@@ -9,7 +9,7 @@
 //     a page break — each exercise, and each routine that fits, stays in one place.
 
 import { EXIDX } from './exercises.js'
-import { modeOf, fmtSec } from './history.js'
+import { modeOf, fmtSec, restSeconds } from './history.js'
 import { uid, todayISO, DAYN, fmtNum, exCount } from './format.js'
 import { t } from './i18n.js'
 
@@ -39,6 +39,7 @@ function cleanEx(e) {
   if (e.inc > 0) o.inc = e.inc
   if (e.repsMin != null) o.repsMin = e.repsMin
   if (e.sg) o.sg = e.sg
+  if (restSeconds(e)) o.restSec = e.restSec
   return o
 }
 
@@ -76,6 +77,7 @@ export function parsePlan(raw) {
   const routines = data.routines.filter(r => r && Array.isArray(r.ex)).map(r => ({
     ...r,
     ex: r.ex.filter(e => {
+      if (e && typeof e === 'object' && 'restSec' in e && restSeconds(e) === undefined) throw new Error(t('Rest timer must be between 1 and 3600 whole seconds'))
       const ok = !!e && (known.has(e.id) || !!EXIDX[e.id])
       if (!ok) dropped++
       return ok
@@ -166,7 +168,8 @@ function routineHTML(r, unit) {
       const ex = EXIDX[e.id]
       const name = ex ? ex.n : t('Unknown exercise')
       const part = ex && ex.bp && ex.bp !== 'cardio' ? `<span class="part">${esc(ex.bp)}</span>` : ''
-      return `<div class="ex"><div class="ex-n">${esc(name)}${part}</div><div class="ex-s">${esc(scheme(e, unit))}</div></div>`
+      const rest = restSeconds(e) ? ` · ${t('Rest')} ${fmtSec(e.restSec)}` : ''
+      return `<div class="ex"><div class="ex-n">${esc(name)}${part}</div><div class="ex-s">${esc(scheme(e, unit) + rest)}</div></div>`
     }).join('')
     return u.length > 1
       ? `<div class="ss"><div class="ss-tag">${esc(t('Superset'))}</div><div class="ss-items">${items}</div></div>`

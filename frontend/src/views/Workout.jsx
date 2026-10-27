@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { exOr } from '../lib/exercises.js'
-import { effectiveRoutine, lastEntryFor, bestWeightFor, buildSets, setsDoneActive, supersetUnits, unitOf, setLabel, modeOf, EFFORT, effortOf, stepEffort, capEffort } from '../lib/history.js'
+import { effectiveRoutine, lastEntryFor, bestWeightFor, buildSets, setsDoneActive, supersetUnits, setLabel, modeOf, EFFORT, effortOf, stepEffort, capEffort, restSeconds } from '../lib/history.js'
+import { exerciseDone, workoutDone, nextUnfinished, restAfterSet } from '../lib/workout-progress.js'
 import { fmtNum, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
@@ -138,37 +139,71 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   </>
 }
 
+function ExercisePanel({ id, open, children }) {
+  const [mounted, setMounted] = useState(open)
+  const [expanded, setExpanded] = useState(open)
+  useEffect(() => {
+    let frame, nextFrame, timer
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setMounted(open); setExpanded(open)
+    } else if (open) {
+      setMounted(true)
+      frame = requestAnimationFrame(() => { nextFrame = requestAnimationFrame(() => setExpanded(true)) })
+    } else {
+      setExpanded(false)
+      timer = setTimeout(() => setMounted(false), 220)
+    }
+    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(nextFrame); clearTimeout(timer) }
+  }, [open])
+  return <div id={id} className={'workout-ex-panel' + (expanded ? ' expanded' : '')} aria-hidden={!open} inert={!open}>
+    <div className="workout-ex-panel-inner">{mounted && children}</div>
+  </div>
+}
+
 /* ---------- active workout ---------- */
 function ActiveWorkout() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const { startRest, stopRest } = useUI()
+  const sheetCount = useUI(s => s.sheets.length)
   const A = S.active
   const units = supersetUnits(A.entries)
-  const cur = Math.min(A.cur, Math.max(0, A.entries.length - 1))
-  const unit = A.entries.length ? unitOf(units, cur) : []
-  const unitIdx = units.findIndex(u => u === unit)
-  const isSuperset = unit.length > 1
+  const [collapsed, setCollapsed] = useState(() => new Set(A.entries.flatMap((e, idx) => exerciseDone(e) ? [idx] : [])))
+  const [pending, setPending] = useState(null)
+  const [scrollTo, setScrollTo] = useState(() => A.cur > 0 ? { sessionId: A.id, idx: Math.min(A.cur, A.entries.length - 1) } : null)
+  const cards = useRef([])
 
   const total = A.entries.reduce((n, e) => n + e.sets.length, 0)
   const done = setsDoneActive(A)
 
-  const mutEntry = (idx, fn) => update(s => { fn(s.active.entries[idx]) }, true)
+  const mutEntry = (idx, fn) => update(s => { if (s.active?.id === A.id && s.active.entries[idx]) fn(s.active.entries[idx]) }, true)
   // Clearing an optional field drops the key rather than storing null, so a set only carries
   // what was actually logged — in the session, in history and in a backup.
   const setField = (idx, i, field, v) => mutEntry(idx, e => {
     if (v == null) delete e.sets[i][field]; else e.sets[i][field] = v
   })
-  const modeAt = idx => modeOf({ ...(A.entries[idx].target || {}), id: A.entries[idx].id })
-  const addSet = idx => mutEntry(idx, e => {
+  const addSet = idx => { setCollapsed(closed => { const next = new Set(closed); next.delete(idx); return next }); mutEntry(idx, e => {
     const l = e.sets[e.sets.length - 1]
     const m = modeOf({ ...(e.target || {}), id: e.id })
     if (m === 'cardio') e.sets.push({ min: l ? l.min : (e.target.min || 20), speed: l ? l.speed : (e.target.speed || 8), done: false })
     else if (m === 'time') e.sets.push({ sec: l ? l.sec : (e.target.sec || 45), w: l ? (l.w || 0) : (e.target.weight || 0), done: false })
     else e.sets.push({ w: l ? l.w : 0, r: l ? l.r : e.target.reps, done: false })
-  })
-  const removeSet = idx => mutEntry(idx, e => { if (e.sets.length > 1) e.sets.pop() })
+  }) }
+  const removeSet = idx => {
+    let completed = false, askTop = false
+    mutEntry(idx, e => {
+      const wasDone = exerciseDone(e)
+      if (e.sets.length > 1) e.sets.pop()
+      completed = !wasDone && exerciseDone(e)
+      if (completed && modeOf({ ...e.target, id: e.id }) === 'reps' && !e.asked) { e.asked = true; askTop = true }
+    })
+    if (completed) {
+      if (restAfterSet(useStore.getState().S.active.entries, idx) === 'stop') stopRest()
+      setPending({ sessionId: A.id, idx })
+    }
+    if (askTop) topWeightSheet(idx)
+  }
 
   // A timed set is held, not typed. The work timer records what was actually held — an early
   // finish logs 0:38 of a 0:45 target rather than crediting the full prescription — and then
@@ -186,31 +221,57 @@ function ActiveWorkout() {
   }
 
   const toggle = (idx, i) => {
-    const m = modeAt(idx)
-    const cardioEntry = m === 'cardio'
-    const isLastUnit = unitIdx >= units.length - 1
-    let askTop = false, exJustDone = false, workoutDone = false
-    mutEntry(idx, e => {
+    let askTop = false, exJustDone = false, checked = false, rest = 'none', seconds = 0, sound = false
+    update(s => {
+      if (s.active?.id !== A.id) return
+      const e = s.active.entries[idx]
+      if (!e?.sets[i]) return
       e.sets[i].done = !e.sets[i].done
       if (e.sets[i].done) {
-        beep(S.sound, 1040, 0.12); vibrate(30)
-        const isLastExInUnit = idx === unit[unit.length - 1]
-        const unitDone = unit.every(ui => (ui === idx ? e : A.entries[ui]).sets.every(x => x.done))
-        if (isLastExInUnit && !unitDone) startRest(S.restSec)
-        else if (unitDone) stopRest()
-        if (unitDone && isLastUnit) workoutDone = true      // last exercise's last set → done
-        // Only reps training has a "working weight" worth confirming — a bodyweight plank
-        // has nothing to put in that slider.
-        if (e.sets.every(x => x.done)) { exJustDone = true; if (m === 'reps' && !e.asked) { e.asked = true; askTop = true } }
+        checked = true
+        sound = s.sound
+        rest = restAfterSet(s.active.entries, idx)
+        seconds = restSeconds(e.target, s.restSec)
+        exJustDone = exerciseDone(e)
+        if (exJustDone && modeOf({ ...e.target, id: e.id }) === 'reps' && !e.asked) { e.asked = true; askTop = true }
       }
     })
-    // reps: topWeight first (it chains into the finish/continue prompt on the last unit).
-    // cardio/timed or already-confirmed: go straight to the prompt.
+    if (checked) { beep(sound, 1040, 0.12); vibrate(30) }
+    if (rest === 'start') startRest(seconds)
+    else if (rest === 'stop') stopRest()
+    if (exJustDone) setPending({ sessionId: A.id, idx })
     if (askTop) topWeightSheet(idx)
-    else if (workoutDone) workoutCompleteSheet()
-    else if (exJustDone && cardioEntry) useUI.getState().toast(t('Cardio logged'))
-    else if (exJustDone && m === 'time') useUI.getState().toast(t('Hold logged'))
   }
+
+  // Wait for weight confirmation (including swipe/backdrop dismissal) before moving the page.
+  useEffect(() => {
+    if (!pending || sheetCount) return
+    const active = useStore.getState().S.active
+    setPending(null)
+    if (active?.id !== pending.sessionId || !exerciseDone(active.entries[pending.idx])) return
+    const next = nextUnfinished(active.entries, pending.idx)
+    setCollapsed(closed => { const changed = new Set(closed); changed.add(pending.idx); if (next >= 0) changed.delete(next); return changed })
+    if (workoutDone(active)) { workoutCompleteSheet(active.id); return }
+    if (next >= 0) {
+      update(s => { if (s.active?.id === active.id) s.active.cur = next })
+      setScrollTo({ sessionId: active.id, idx: next })
+    }
+  }, [pending, sheetCount])
+
+  useEffect(() => {
+    if (!scrollTo || sheetCount) return
+    let frame
+    const card = cards.current[scrollTo.idx]
+    card?.querySelector('.workout-ex-toggle')?.focus({ preventScroll: true })
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Let the completed card finish shrinking before measuring the next card's position.
+    const timer = setTimeout(() => { frame = requestAnimationFrame(() => {
+      if (useStore.getState().S.active?.id !== scrollTo.sessionId) return
+      card?.scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'start' })
+      setScrollTo(null)
+    }) }, reduced ? 0 : 220)
+    return () => { clearTimeout(timer); cancelAnimationFrame(frame) }
+  }, [scrollTo, sheetCount])
 
   // Live-presence heartbeat so the admin dashboard can show who's training now. Signed-in only —
   // guests have no server session. Reads fresh state each tick so progress stays current.
@@ -247,34 +308,48 @@ function ActiveWorkout() {
     </div>
     <div className="wprog"><i style={{ width: (total ? done / total * 100 : 0) + '%' }} /></div>
 
-    {A.entries.length ? <>
-      <div className="muted small" style={{ marginBottom: 6 }}>{isSuperset ? t('Superset {0} / {1}', unitIdx + 1, units.length) : t('Exercise {0} / {1}', unitIdx + 1, units.length)}</div>
-      {isSuperset ? (
-        <div className="ss-card">
-          <div className="ss-hd"><Icon name="link" />{t('Superset · do these back-to-back, rest after both')}</div>
-          {unit.map((idx, k) => <div key={idx} className="ss-ex">
-            {k > 0 && <div className="ss-amp">+</div>}
-            <ExerciseBlock entryIdx={idx} compact
-              onToggle={i => toggle(idx, i)} onField={(i, f, v) => setField(idx, i, f, v)} onAddSet={() => addSet(idx)} onRemoveSet={() => removeSet(idx)} onStartTimed={i => startTimed(idx, i)} />
-          </div>)}
-        </div>
-      ) : (
-        <ExerciseBlock entryIdx={cur} onToggle={i => toggle(cur, i)} onField={(i, f, v) => setField(cur, i, f, v)} onAddSet={() => addSet(cur)} onRemoveSet={() => removeSet(cur)} onStartTimed={i => startTimed(cur, i)} />
-      )}
-    </> : <div className="empty"><div className="ico"><Icon name="shuffle" /></div>{t('Freestyle workout — add your first exercise.')}</div>}
-
-    <div style={{ height: 12 }} />
-    <div className="row">
-      <Button icon="chevronLeft" disabled={unitIdx <= 0} onClick={() => update(s => { s.active.cur = units[unitIdx - 1][0] })}>{t('Prev')}</Button>
-      <Button trailingIcon="chevronRight" disabled={unitIdx < 0 || unitIdx >= units.length - 1} onClick={() => update(s => { s.active.cur = units[unitIdx + 1][0] })}>{t('Next')}</Button>
-    </div>
+    {A.entries.length ? <div className="workout-exercises">
+      {units.map(unit => <div key={unit[0]} className={unit.length > 1 ? 'ss-card' : ''}>
+        {unit.length > 1 && <div className="ss-hd"><Icon name="link" />{t('Superset · do these back-to-back, rest after both')}</div>}
+        {unit.map(idx => {
+          const entry = A.entries[idx], complete = exerciseDone(entry), open = !collapsed.has(idx)
+          const name = exOr(entry.id).n
+          return <section key={idx} className={'workout-ex' + (complete ? ' complete' : '')} ref={el => { cards.current[idx] = el }}>
+            <h2 className="workout-ex-heading">
+              <button className="workout-ex-toggle" aria-expanded={open} aria-controls={'workout-ex-' + idx}
+                onClick={() => {
+                  setCollapsed(closed => { const changed = new Set(closed); if (changed.has(idx)) changed.delete(idx); else changed.add(idx); return changed })
+                  update(s => { if (s.active?.id === A.id) s.active.cur = idx })
+                }}>
+                <span className="workout-ex-number">{complete ? <Icon name="check" /> : idx + 1}</span>
+                <span className="grow"><span className="capitalize">{name}</span><span className="small muted workout-ex-progress">{t('{0} sets', entry.sets.filter(s => s.done).length + '/' + entry.sets.length)}</span></span>
+                <Icon name="chevronDown" className={'workout-ex-chevron' + (open ? ' expanded' : '')} />
+              </button>
+            </h2>
+            <ExercisePanel id={'workout-ex-' + idx} open={open}>
+              <div className="workout-ex-body"><ExerciseBlock entryIdx={idx} compact={unit.length > 1}
+                onToggle={i => toggle(idx, i)} onField={(i, f, v) => setField(idx, i, f, v)} onAddSet={() => addSet(idx)} onRemoveSet={() => removeSet(idx)} onStartTimed={i => startTimed(idx, i)} /></div>
+            </ExercisePanel>
+          </section>
+        })}
+      </div>)}
+    </div> : <div className="empty"><div className="ico"><Icon name="shuffle" /></div>{t('Freestyle workout — add your first exercise.')}</div>}
     <div style={{ height: 10 }} />
-    <Button onClick={() => exercisePicker(ex => exConfigSheet(ex, null, cfg => update(s => {
+    <Button onClick={() => { const picker = exercisePicker(ex => exConfigSheet(ex, null, cfg => { let idx
+      update(s => {
+      if (s.active?.id !== A.id) return
       const full = { ...cfg, id: ex.id }
       const plan = nextPrescription(s, full, s.routines.find(r => r.id === s.active.routineId))
       s.active.entries.push({ id: ex.id, target: { ...cfg }, plan, sets: applyPrescription(buildSets(s, full), plan) })
       s.active.cur = s.active.entries.length - 1
-    }), null, S.routines.find(r => r.id === A.routineId)))} icon="plus">{t('Add exercise')}</Button>
+      idx = s.active.cur
+    })
+      if (idx !== undefined) {
+        picker.close()
+        setCollapsed(closed => { const changed = new Set(closed); changed.delete(idx); return changed })
+        setScrollTo({ sessionId: A.id, idx })
+      }
+    }, null, S.routines.find(r => r.id === A.routineId), 'Add exercise')) }} icon="plus">{t('Add exercise')}</Button>
     <div style={{ height: 10 }} />
     {(() => {
       const exDone = A.entries.filter(e => e.sets.length && e.sets.every(s => s.done)).length
@@ -289,5 +364,5 @@ function ActiveWorkout() {
 
 export default function Workout() {
   const active = useStore(s => s.S.active)
-  return active ? <ActiveWorkout /> : <StartChooser />
+  return active ? <ActiveWorkout key={active.id} /> : <StartChooser />
 }

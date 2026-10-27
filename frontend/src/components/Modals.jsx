@@ -6,7 +6,7 @@ function Sheet({ sheet }) {
   const { closeSheet } = useUI()
   const ref = useRef(null)
   const drag = useRef({ startY: null, startX: null, delta: 0, axis: null })
-  const { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel } = createSheetTouchHandlers(ref, drag, sheet, closeSheet)
+  const { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel, onPointerDown, onPointerMove, onPointerUp, onPointerCancel } = createSheetTouchHandlers(ref, drag, sheet, closeSheet)
 
   useEffect(() => {
     const el = ref.current
@@ -27,7 +27,8 @@ function Sheet({ sheet }) {
   return (
     <div>
       <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
-      <div className="sheet" ref={ref} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
+      <div className="sheet" ref={ref} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
         <div className="grab" />
         {sheet.render(close)}
       </div>

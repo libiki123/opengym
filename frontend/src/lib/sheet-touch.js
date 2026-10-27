@@ -4,13 +4,15 @@ export function createSheetTouchHandlers(ref, drag, sheet, closeSheet) {
       drag.current = { startY: null, startX: null, delta: 0, axis: null }
       return
     }
-    drag.current = { startY: ref.current.scrollTop <= 0 ? e.touches[0].clientY : null, startX: e.touches[0].clientX, delta: 0, axis: null }
+    const point = e.touches ? e.touches[0] : e
+    drag.current = { startY: ref.current.scrollTop <= 0 ? point.clientY : null, startX: point.clientX, delta: 0, axis: null }
   }
   const onTouchMove = e => {
     const el = ref.current, d = drag.current
     if (d.startY === null) return
-    const dx = e.touches[0].clientX - d.startX
-    d.delta = e.touches[0].clientY - d.startY
+    const point = e.touches ? e.touches[0] : e
+    const dx = point.clientX - d.startX
+    d.delta = point.clientY - d.startY
     if (!d.axis && Math.max(Math.abs(dx), Math.abs(d.delta)) > 8) d.axis = Math.abs(dx) > Math.abs(d.delta) ? 'x' : 'y'
     if (d.axis === 'y' && d.delta > 0 && el.scrollTop <= 0) {
       e.preventDefault()
@@ -36,5 +38,17 @@ export function createSheetTouchHandlers(ref, drag, sheet, closeSheet) {
       ref.current.style.transform = ''
     }
   }
-  return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel }
+  const onPointerDown = e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('button, input, select, textarea, a, [contenteditable]')) return
+    onTouchStart(e)
+  }
+  const onPointerMove = e => {
+    if (e.pointerType !== 'mouse') return
+    if (e.buttons === 0) { onTouchCancel(); return }
+    onTouchMove(e)
+    if (drag.current.axis === 'y' && drag.current.delta > 0) e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onPointerUp = e => { if (e.pointerType === 'mouse') onTouchEnd() }
+  const onPointerCancel = e => { if (e.pointerType === 'mouse') onTouchCancel() }
+  return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel, onPointerDown, onPointerMove, onPointerUp, onPointerCancel }
 }
